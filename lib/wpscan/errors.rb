@@ -7,6 +7,7 @@ module WPScan
   end
 end
 
+require_relative 'errors/cache'
 require_relative 'errors/http'
 require_relative 'errors/scan'
 require_relative 'errors/enumeration'
