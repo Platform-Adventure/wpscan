@@ -259,7 +259,7 @@ describe WPScan::Model::WpItem do
   describe '#active_installs' do
     context 'when wordpress_org_api_url is nil' do
       it 'returns nil and does not make a request' do
-        expect(WPScan::Browser).not_to receive(:get)
+        expect(Typhoeus).not_to receive(:get)
         expect(wp_item.active_installs).to be_nil
       end
     end
@@ -283,7 +283,7 @@ describe WPScan::Model::WpItem do
 
         it 'shares a single HTTP call with API-sourced last_updated' do
           allow(wp_item).to receive(:metadata).and_return({})
-          expect(WPScan::Browser).to receive(:get).once.and_call_original
+          expect(Typhoeus).to receive(:get).once.and_call_original
           expect(wp_item.active_installs).to eql 1234
           expect(wp_item.last_updated).to eql '2024-01-15 10:30am GMT'
         end
@@ -310,6 +310,46 @@ describe WPScan::Model::WpItem do
 
         it 'returns nil' do
           expect(wp_item.active_installs).to be_nil
+        end
+      end
+
+      context 'when target-only options are supplied' do
+        let(:cli_args) do
+          "--url #{url} --http-auth alice:secret --cookie-string wordpress_logged_in=abc " \
+            '--headers Authorization:Bearer-xyz --vhost target.lab ' \
+            '--proxy http://127.0.0.1:8080 --proxy-auth puser:ppass'
+        end
+
+        before do
+          WPScan::ParsedCli.options = rspec_parsed_options(cli_args)
+          WPScan::Browser.instance.load_options(WPScan::ParsedCli.options.dup)
+
+          stub_request(:get, api_url).to_return(status: 200, body: { 'active_installs' => 42 }.to_json)
+        end
+
+        after { WPScan::Browser.reset }
+
+        it 'does not send target credentials, cookies, headers or Referer to wordpress.org' do
+          expect(wp_item.active_installs).to eql 42
+
+          expect(
+            a_request(:get, api_url).with do |req|
+              headers = req.headers.transform_keys(&:downcase)
+
+              req.uri.userinfo.nil? && !headers.key?('authorization') && !headers.key?('cookie') &&
+                !headers.key?('referer') && !headers.key?('host')
+            end
+          ).to have_been_made.once
+        end
+
+        it 'only uses connection params' do
+          params = wp_item.send(:wordpress_org_request_params)
+
+          expect(params).to_not include(:userpwd, :cookie, :cookiejar, :cookiefile)
+          expect(params[:headers].keys).to eql ['User-Agent']
+          expect(params[:proxy]).to eql 'http://127.0.0.1:8080'
+          expect(params[:proxyuserpwd]).to eql 'puser:ppass'
+          expect(params[:timeout]).to eql described_class::WordpressOrgData::WORDPRESS_ORG_API_TIMEOUT
         end
       end
     end
