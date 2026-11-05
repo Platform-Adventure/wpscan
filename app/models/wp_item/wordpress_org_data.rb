@@ -39,13 +39,37 @@ module WPScan
           url = wordpress_org_api_url
           return {} unless url
 
-          res = Browser.get(url, connecttimeout: WORDPRESS_ORG_API_TIMEOUT, timeout: WORDPRESS_ORG_API_TIMEOUT)
+          # Typhoeus.get is used rather than Browser.get so that target-only options
+          # (http auth, cookies, custom headers, vhost, Referer) are not sent to wordpress.org
+          res = Typhoeus.get(url, wordpress_org_request_params)
           return {} unless res.code == 200
 
           data = JSON.parse(res.body)
           data.is_a?(Hash) ? data : {}
         rescue StandardError
           {}
+        end
+
+        # @return [ Hash ] Connection-only params (timeouts, proxy, TLS) for the wordpress.org API
+        def wordpress_org_request_params
+          browser = Browser.instance
+          params  = browser.default_connect_request_params.merge(
+            connecttimeout: WORDPRESS_ORG_API_TIMEOUT,
+            timeout: WORDPRESS_ORG_API_TIMEOUT,
+            accept_encoding: 'gzip, deflate',
+            headers: { 'User-Agent' => browser.default_user_agent }
+          )
+
+          if browser.proxy_auth
+            params[:proxyuserpwd] = "#{browser.proxy_auth[:username]}:#{browser.proxy_auth[:password]}"
+          end
+
+          if ParsedCli.proxy_target_only
+            params.delete(:proxy)
+            params.delete(:proxyuserpwd)
+          end
+
+          params
         end
       end
 
