@@ -223,6 +223,37 @@ describe WPScan::Controller::Core do
           end
         end
 
+        context 'to the wp-admin/install.php with JSON breaking chars in the query string' do
+          let(:redirection) { "#{target_url}wp-admin/install.php?\",\"x\":\"y" }
+          let(:expected_msg) do
+            'The Website is not fully configured and currently in install mode. ' \
+              "Create a new admin user at #{redirection}"
+          end
+
+          %w[json jsonl].each do |format|
+            context "when --format #{format}" do
+              let(:cli_args) { "#{super()} --format #{format}" }
+
+              it 'escapes the URL and does not inject keys in the output' do
+                allow(core.formatter).to receive(:output).with('not_fully_configured', any_args).and_call_original
+
+                original_stdout = $stdout
+                $stdout = StringIO.new
+
+                begin
+                  expect { core.before_scan }.to raise_error(SystemExit)
+                  core.formatter.beautify
+                  output = $stdout.string
+                ensure
+                  $stdout = original_stdout
+                end
+
+                expect(JSON.parse(output)).to eql('not_fully_configured' => expected_msg)
+              end
+            end
+          end
+        end
+
         context 'to something else' do
           let(:redirection) { 'http://g.com/' }
 
