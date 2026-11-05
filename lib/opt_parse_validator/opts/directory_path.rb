@@ -9,9 +9,11 @@ module OptParseValidator
       @attrs.merge!(directory: true)
     end
 
+    # Uses attrs[:mode], if set, as the mode of the created directories
+    #
     # @param [ Pathname ] path
     def check_create(path)
-      FileUtils.mkdir_p(path.to_s)
+      FileUtils.mkdir_p(path.to_s, **attrs.slice(:mode))
     end
   end
 end

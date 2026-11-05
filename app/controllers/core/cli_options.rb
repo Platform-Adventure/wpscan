@@ -147,6 +147,7 @@ module WPScan
                                readable: true,
                                writable: true,
                                create: true,
+                               mode: 0o700,
                                default: tmp_directory.join('cache'),
                                advanced: true)
         ]

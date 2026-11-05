@@ -7,7 +7,13 @@ describe WPScan::Finders::ThemeVersion::Style do
   let(:fixtures)   { FINDERS_FIXTURES.join('theme_version', 'style') }
 
   before :all do
-    Typhoeus::Config.cache = WPScan::Cache::Typhoeus.new(SPECS.join('cache'))
+    @cache_dir = Dir.mktmpdir
+    Typhoeus::Config.cache = WPScan::Cache::Typhoeus.new(@cache_dir)
+  end
+
+  after :all do
+    Typhoeus::Config.cache = nil
+    FileUtils.rm_rf(@cache_dir)
   end
 
   before do

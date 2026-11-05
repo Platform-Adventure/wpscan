@@ -38,6 +38,20 @@ describe OptParseValidator::OptDirectoryPath do
 
         FileUtils.remove_dir(dir_path)
       end
+
+      context 'when :mode' do
+        let(:attrs) { super().merge(mode: 0o700) }
+        let(:dir_path) { OPV_FIXTURES.join('dir_path', 'sub').to_s }
+
+        after { FileUtils.remove_dir(OPV_FIXTURES.join('dir_path').to_s) }
+
+        it 'creates it, and the missing parents, with the mode' do
+          opt.validate(dir_path)
+
+          expect(File.stat(dir_path).mode & 0o777).to eql 0o700
+          expect(File.stat(File.dirname(dir_path)).mode & 0o777).to eql 0o700
+        end
+      end
     end
   end
 end
